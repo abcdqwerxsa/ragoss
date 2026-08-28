@@ -1,0 +1,10 @@
+[
+  {
+    "query": "示例:这张截图里的报错是什么?",
+    "expected": ["my-oss://docs/screenshots/error-001.png"]
+  },
+  {
+    "query": "示例:部署笔记里 Cloud Run 的超时怎么配?",
+    "expected": ["my-oss://docs/notes/cloudrun.md", "nas://kb/infra/cloudrun.md"]
+  }
+]
