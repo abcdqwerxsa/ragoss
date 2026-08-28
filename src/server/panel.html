@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ragoss 控制台</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.3rem; } h2 { font-size: 1.05rem; margin-top: 2rem; }
+  section { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+  .row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .6rem; margin-bottom: .6rem; }
+  .row > label { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; opacity: .8; }
+  input, select { font: inherit; padding: .35rem .5rem; border-radius: 5px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; }
+  .card { border: 1px dashed color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; padding: .8rem; margin-bottom: .8rem; }
+  .card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; font-weight: 600; }
+  button { font: inherit; padding: .35rem .9rem; border-radius: 6px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: transparent; color: inherit; cursor: pointer; }
+  button.primary { background: color-mix(in srgb, currentColor 85%, transparent); border-color: transparent; }
+  #bar { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  #msg { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .8rem; margin-top: 1rem; }
+  .ok { color: #2e9e5b; } .err { color: #d64545; }
+  .del { font-size: .8rem; padding: .1rem .5rem; }
+</style>
+</head>
+<body>
+<h1>ragoss 控制台</h1>
+<div id="bar">
+  <button class="primary" onclick="save()">保存并生效</button>
+  <button onclick="test()">测试连通</button>
+  <button onclick="runIndex()">立即索引</button>
+  <button onclick="load()">重新加载</button>
+  <span id="health" style="opacity:.7"></span>
+</div>
+<div id="msg"></div>
+<div id="root"><p>加载中…</p></div>
+
+<script>
+const KEEP = "__KEEP__";
+const STORAGE_FIELDS = [
+  ["type","类型","select",["s3","webdav"]], ["name","名称","text"],
+  ["endpoint","Endpoint","text"], ["region","Region","text"], ["bucket","Bucket","text"],
+  ["prefix","Prefix","text"], ["accessKeyId","AccessKeyId","password"],
+  ["secretAccessKey","SecretAccessKey","password"], ["username","用户名","password"],
+  ["password","密码","password"],
+];
+const EMBED_FIELDS = [
+  ["name","路由名","text"], ["provider","Provider","select",["dashscope","google"]],
+  ["baseUrl","BaseURL(可选)","text"], ["apiKey","API Key","password"], ["model","Model","text"],
+  ["dims","维度(可选)","number"],
+];
+const QA_FIELDS = [
+  ["protocol","协议","select",["openai","openai-responses","google","anthropic"]],
+  ["baseUrl","BaseURL","text"], ["apiKey","API Key","password"], ["model","Model","text"],
+  ["maxSources","引用条数","number"],
+];
+let cfg = null;
+
+function tokenHeaders() {
+  const t = localStorage.getItem("ragoss_token") ?? "";
+  return t ? { Authorization: "Bearer " + t } : {};
+}
+async function api(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: { ...tokenHeaders(), ...(body ? { "Content-Type": "application/json" } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (r.status === 401) {
+    const t = prompt("请输入管理令牌 (ADMIN_TOKEN):");
+    if (t !== null) localStorage.setItem("ragoss_token", t);
+    throw new Error("未授权,令牌已保存,请重试");
+  }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+function msg(s, cls) {
+  const el = document.getElementById("msg");
+  el.textContent = s;
+  el.className = cls || "";
+}
+function field(def, val) {
+  const [key, label, type, options] = def;
+  const id = esc(key);
+  if (type === "select") {
+    return `<label>${label}<select data-k="${id}">${options.map(o =>
+      `<option ${o === val ? "selected" : ""}>${o}</option>`).join("")}</select></label>`;
+  }
+  const isSecret = type === "password";
+  const ph = isSecret && val === KEEP ? "已设置(不改则保留)" : "";
+  const v = isSecret && val === KEEP ? "" : (val ?? "");
+  return `<label>${label}<input data-k="${id}" type="${type === "number" ? "number" : isSecret ? "password" : "text"}" value="${esc(String(v))}" placeholder="${ph}"></label>`;
+}
+function card(fields, obj, title, onRemove) {
+  const rows = fields.map((f) => field(f, obj?.[f[0]])).join("");
+  return `<div class="card"><header><span>${esc(title)}</span>${onRemove ? `<button class="del" onclick="${onRemove}">删除</button>` : ""}</header><div class="row">${rows}</div></div>`;
+}
+function esc(s) { return s.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+function collect(root, fields, defaults = {}) {
+  const out = { ...defaults };
+  root.querySelectorAll("[data-k]").forEach((el) => {
+    const k = el.dataset.k;
+    const f = fields.find((x) => x[0] === k);
+    let v = el.value.trim();
+    if (f && f[2] === "password" && v === "" && el.placeholder) v = KEEP;   // keep existing secret
+    if (v === "") return;
+    out[k] = f && f[2] === "number" ? Number(v) : v;
+  });
+  return out;
+}
+
+function render() {
+  const root = document.getElementById("root");
+  const st = (cfg.storages ?? []).map((s, i) =>
+    card(STORAGE_FIELDS, s, `存储:${s.name || "#" + (i + 1)}`, `delItem('storages',${i})`)).join("");
+  const em = (cfg.embeddings ?? []).map((e, i) =>
+    card(EMBED_FIELDS, e, `嵌入路由:${e.name || "#" + (i + 1)}`, `delItem('embeddings',${i})`)).join("");
+  const qa = card(QA_FIELDS, cfg.qa, "问答模型");
+  const ret = card([["topK","每路召回 topK","number"],["finalK","最终 finalK","number"]], cfg.retrieval ?? {}, "检索参数");
+  const db = card([["path","本地路径","text"],["storage","回存存储名","text"],["key","回存 key","text"]],
+    { path: cfg.db?.path, storage: cfg.db?.remote?.storage, key: cfg.db?.remote?.key }, "数据库");
+  root.innerHTML = `
+    <h2>存储后端</h2>${st}<button onclick="addItem('storages')">+ 添加存储</button>
+    <h2>嵌入模型(多路)</h2>${em}<button onclick="addItem('embeddings')">+ 添加嵌入路由</button>
+    <h2>问答模型</h2>${qa}
+    <h2>检索参数</h2>${ret}
+    <h2>数据库</h2>${db}
+    <p style="opacity:.6;font-size:.8rem">密钥留空 = 保留现有值;支持 env:VAR 环境变量引用。保存后立即热生效并写回 config.json。</p>`;
+}
+function addItem(sec) { cfg[sec].push(sec === "storages" ? { type: "s3", name: "" } : { provider: "dashscope", name: "" }); render(); }
+function delItem(sec, i) { cfg[sec].splice(i, 1); render(); }
+
+function collectAll() {
+  const root = document.getElementById("root");
+  const cards = root.querySelectorAll(".card");
+  const secs = { storages: [], embeddings: [] };
+  cards.forEach((el) => {
+    const title = el.querySelector("header span").textContent;
+    if (title.startsWith("存储:")) secs.storages.push(collect(el, STORAGE_FIELDS, { type: el.querySelector("[data-k=type]")?.value ?? "s3" }));
+    else if (title.startsWith("嵌入路由:")) secs.embeddings.push(collect(el, EMBED_FIELDS));
+    else if (title.startsWith("问答模型")) cfg.qa = collect(el, QA_FIELDS);
+    else if (title.startsWith("检索参数")) {
+      const r = collect(el, [["topK","","number"],["finalK","","number"]]);
+      cfg.retrieval = { topK: r.topK ?? 20, finalK: r.finalK ?? 6 };
+    } else if (title.startsWith("数据库")) {
+      const d = collect(el, [["path","","text"],["storage","","text"],["key","","text"]]);
+      cfg.db = { ...(d.path ? { path: d.path } : {}), ...(d.storage || d.key ? { remote: { storage: d.storage ?? "", key: d.key ?? "" } } : {}) };
+    }
+  });
+  cfg.storages = secs.storages;
+  cfg.embeddings = secs.embeddings;
+}
+
+async function load() {
+  try {
+    cfg = await api("GET", "/api/config");
+    render();
+    const h = await api("GET", "/health");
+    document.getElementById("health").textContent = `已索引 ${h.vectors} 向量 / 路由: ${h.routes.join(", ")}`;
+    msg("配置已加载");
+  } catch (e) { msg(String(e.message || e), "err"); }
+}
+async function save() {
+  collectAll();
+  try {
+    const r = await api("PUT", "/api/config", cfg);
+    msg("已保存并热生效:" + r.saved, "ok");
+    await load();
+  } catch (e) { msg("保存失败:" + (e.message || e), "err"); }
+}
+async function test() {
+  msg("测试中…(最长 15s/项)");
+  try {
+    const r = await api("POST", "/api/config/test");
+    msg(r.results.map((x) => `[${x.kind}] ${x.name}: ${x.ok ? "✓ " + x.detail : "✗ " + x.detail}`).join("\n"),
+        r.results.every((x) => x.ok) ? "ok" : "err");
+  } catch (e) { msg(String(e.message || e), "err"); }
+}
+async function runIndex() {
+  msg("索引中…");
+  try {
+    const r = await api("POST", "/api/index");
+    msg(`索引完成:新增 ${r.added} / 更新 ${r.changed} / 删除 ${r.removed} / 失败 ${r.errors.length}` +
+        (r.errors.length ? "\n" + r.errors.map((e) => `${e.storage}://${e.key}: ${e.error}`).join("\n") : ""),
+        r.errors.length ? "err" : "ok");
+    await load();
+  } catch (e) { msg(String(e.message || e), "err"); }
+}
+load();
+</script>
+</body>
+</html>

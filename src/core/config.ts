@@ -118,11 +118,19 @@ function validate(c: Config): void {
   }
 }
 
+export function validateConfig(c: Config): void {
+  validate(c);
+}
+
+export function configFilePath(p?: string): string {
+  return path.resolve(p ?? process.env.RAGOSS_CONFIG ?? "config.json");
+}
+
 export function loadConfig(p?: string): Config {
-  const file = p ?? process.env.RAGOSS_CONFIG ?? "config.json";
+  const file = configFilePath(p);
   let raw: string;
   try {
-    raw = readFileSync(path.resolve(file), "utf8");
+    raw = readFileSync(file, "utf8");
   } catch {
     fail(`cannot read ${file} (set RAGOSS_CONFIG or create config.json, see config.example.json)`);
   }

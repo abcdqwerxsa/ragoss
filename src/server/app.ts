@@ -1,47 +1,34 @@
-/** ragoss HTTP server: /health, /index, /search, /ask. */
+/** ragoss HTTP server: /health, /index, /search, /ask + admin panel (config hot-reload). */
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { loadConfig } from "../core/config.js";
-import { openDb, countVectors } from "../db.js";
-import { buildEmbeddings } from "../embedding/index.js";
-import { dbPath, pullDbIfMissing } from "../index/dbsync.js";
+import { loadConfig, type Config } from "../core/config.js";
+import { countVectors } from "../db.js";
 import { runIndex } from "../index/pipeline.js";
-import { createQaProvider, askWithSources } from "../qa/index.js";
+import { askWithSources } from "../qa/index.js";
 import { retrieve } from "../search/retrieve.js";
-import { buildStorages } from "../storage/index.js";
 import type { RetrievalFilter } from "../core/types.js";
+import { buildRuntime, type Runtime } from "./runtime.js";
+import { mountAdmin } from "./admin.js";
 
-export interface AppContext {
-  app: Hono;
-  storages: ReturnType<typeof buildStorages>;
-  embeddings: ReturnType<typeof buildEmbeddings>;
-}
-
-export async function createApp(): Promise<AppContext> {
-  const cfg = loadConfig();
-  const storages = buildStorages(cfg);
-  const embeddings = buildEmbeddings(cfg);
-  const qa = createQaProvider(cfg.qa);
-
-  await pullDbIfMissing(cfg, storages);
-  const db = openDb(dbPath(cfg));
+export async function createApp(): Promise<{ app: Hono; runtime: Runtime }> {
+  let rt = await buildRuntime(loadConfig());
 
   const app = new Hono();
 
   app.get("/health", (c) =>
-    c.json({ ok: true, vectors: countVectors(db), routes: embeddings.map((e) => e.name) }),
+    c.json({ ok: true, vectors: countVectors(rt.db), routes: rt.embeddings.map((e) => e.name) }),
   );
 
   app.post("/index", async (c) => {
     const body = await c.req.json().catch(() => ({}));
-    const report = await runIndex(cfg, storages, embeddings, db, { full: body?.full === true });
+    const report = await runIndex(rt.cfg, rt.storages, rt.embeddings, rt.db, { full: body?.full === true });
     return c.json(report);
   });
 
   app.post("/search", async (c) => {
     const body = await c.req.json();
     if (!body?.query) return c.json({ error: "query required" }, 400);
-    const hits = await retrieve(db, embeddings, String(body.query), toFilter(body.filter), {
+    const hits = await retrieve(rt.db, rt.embeddings, String(body.query), toFilter(body.filter), {
       topK: num(body.topK),
       finalK: num(body.finalK),
     });
@@ -60,15 +47,21 @@ export async function createApp(): Promise<AppContext> {
   app.post("/ask", async (c) => {
     const body = await c.req.json();
     if (!body?.query) return c.json({ error: "query required" }, 400);
-    const hits = await retrieve(db, embeddings, String(body.query), toFilter(body.filter), {
-      topK: cfg.retrieval?.topK,
-      finalK: cfg.retrieval?.finalK,
+    const hits = await retrieve(rt.db, rt.embeddings, String(body.query), toFilter(body.filter), {
+      topK: rt.cfg.retrieval?.topK,
+      finalK: rt.cfg.retrieval?.finalK,
     });
-    const result = await askWithSources(qa, storages, String(body.query), hits, cfg.qa.maxSources);
+    const result = await askWithSources(rt.qa, rt.storages, String(body.query), hits, rt.cfg.qa.maxSources);
     return c.json(result);
   });
 
-  return { app, storages, embeddings };
+  const reload = async (newCfg: Config): Promise<void> => {
+    rt = await buildRuntime(newCfg, rt);
+  };
+  const getRt = (): Runtime => rt;
+  mountAdmin(app, getRt, reload);
+
+  return { app, get runtime() { return rt; } };
 }
 
 function toFilter(f: unknown): RetrievalFilter {

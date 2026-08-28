@@ -14,14 +14,20 @@ export async function pullDbIfMissing(cfg: Config, storages: StorageProvider[]):
   if (!remote || existsSync(dbPath(cfg))) return false;
   const st = storages.find((s) => s.name === remote.storage);
   if (!st) throw new Error(`db.remote.storage "${remote.storage}" not found`);
-  const { data } = await st.get(remote.key);
-  const fh = await open(dbPath(cfg), "w");
   try {
-    await fh.writeFile(data);
-  } finally {
-    await fh.close();
+    const { data } = await st.get(remote.key);
+    const fh = await open(dbPath(cfg), "w");
+    try {
+      await fh.writeFile(data);
+    } finally {
+      await fh.close();
+    }
+    return true;
+  } catch (e) {
+    // first deploy: remote db not uploaded yet -> start fresh; sync happens after first index
+    console.warn(`[ragoss] remote db pull skipped (${String(e).slice(0, 120)}); starting with fresh local db`);
+    return false;
   }
-  return true;
 }
 
 export async function syncDbToRemote(
