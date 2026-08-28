@@ -15,6 +15,8 @@ export async function createApp(): Promise<{ app: Hono; runtime: Runtime }> {
 
   const app = new Hono();
 
+  app.onError((err, c) => c.json({ error: String((err as Error)?.message ?? err).slice(0, 500) }, 500));
+
   app.get("/health", (c) =>
     c.json({ ok: true, vectors: countVectors(rt.db), routes: rt.embeddings.map((e) => e.name) }),
   );

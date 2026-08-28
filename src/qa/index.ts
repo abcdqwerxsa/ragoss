@@ -39,6 +39,9 @@ export async function askWithSources(
   hits: RetrievalHit[],
   maxSources = 6,
 ): Promise<AskResult> {
+  if (hits.length === 0) {
+    return { answer: "知识库中未找到与问题相关的内容。请先在控制台完成索引,或换个问法。", sources: [] };
+  }
   const used = hits.slice(0, maxSources);
   const parts: ChatPart[] = [];
   const sources: AskResult["sources"] = [];

@@ -40,7 +40,11 @@ export async function retrieve(
       failures.push(`${emb.name}: ${String(e).slice(0, 200)}`);
     }
   }
-  if (rankings.length === 0) throw new Error(`all embedding routes failed: ${failures.join(" | ")}`);
+  // empty index (all routes scanned zero rows) is not an error; provider failures are
+  if (rankings.length === 0) {
+    if (failures.length === 0) return [];
+    throw new Error(`all embedding routes failed: ${failures.join(" | ")}`);
+  }
 
   const fused = rrf(rankings).slice(0, finalK);
   const reranker = opts.reranker ?? noopReranker;

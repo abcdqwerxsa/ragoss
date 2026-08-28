@@ -3,36 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ragoss 控制台</title>
+<title>ragoss 知识库</title>
 <style>
   :root { color-scheme: light dark; }
-  body { font: 14px/1.5 system-ui, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { font-size: 1.3rem; } h2 { font-size: 1.05rem; margin-top: 2rem; }
-  section { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+  body { font: 14px/1.6 system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 0 1rem; }
+  nav { display: flex; gap: .5rem; border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent); padding: .8rem 0; position: sticky; top: 0; background: Canvas; }
+  nav button { border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: .3rem .8rem; opacity: .65; }
+  nav button.active { border-bottom-color: currentColor; opacity: 1; font-weight: 600; }
+  nav .spacer { flex: 1; }
+  nav #status { font-size: .75rem; opacity: .6; align-self: center; }
+  h2 { font-size: 1.05rem; margin-top: 1.5rem; }
+  section.config { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
   .row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .6rem; margin-bottom: .6rem; }
   .row > label { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; opacity: .8; }
-  input, select { font: inherit; padding: .35rem .5rem; border-radius: 5px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; }
+  input, select, textarea { font: inherit; padding: .35rem .5rem; border-radius: 5px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; }
   .card { border: 1px dashed color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; padding: .8rem; margin-bottom: .8rem; }
   .card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; font-weight: 600; }
   button { font: inherit; padding: .35rem .9rem; border-radius: 6px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: transparent; color: inherit; cursor: pointer; }
   button.primary { background: color-mix(in srgb, currentColor 85%, transparent); border-color: transparent; }
-  #bar { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
-  #msg { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .8rem; margin-top: 1rem; }
+  #bar { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin: .8rem 0; }
+  #msg { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .8rem; margin: .5rem 0; }
   .ok { color: #2e9e5b; } .err { color: #d64545; }
   .del { font-size: .8rem; padding: .1rem .5rem; }
+
+  /* chat */
+  #chat { display: flex; flex-direction: column; height: calc(100vh - 130px); }
+  #messages { flex: 1; overflow-y: auto; padding: 1rem 0; display: flex; flex-direction: column; gap: 1rem; }
+  .msg { max-width: 86%; padding: .7rem 1rem; border-radius: 12px; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: color-mix(in srgb, currentColor 12%, transparent); }
+  .msg.bot { align-self: flex-start; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
+  .msg.bot .cite { color: #4d9fdb; font-weight: 600; }
+  .msg .sources { margin-top: .6rem; border-top: 1px dashed color-mix(in srgb, currentColor 25%, transparent); padding-top: .5rem; font-size: .78rem; opacity: .85; }
+  .msg .sources details { margin-top: .25rem; }
+  .msg .sources summary { cursor: pointer; }
+  #inputbar { display: flex; gap: .6rem; padding: .8rem 0; }
+  #q { flex: 1; }
+  .pending { opacity: .6; font-style: italic; }
 </style>
 </head>
 <body>
-<h1>ragoss 控制台</h1>
-<div id="bar">
-  <button class="primary" onclick="save()">保存并生效</button>
-  <button onclick="test()">测试连通</button>
-  <button onclick="runIndex()">立即索引</button>
-  <button onclick="load()">重新加载</button>
-  <span id="health" style="opacity:.7"></span>
+<nav>
+  <button id="tab-chat" class="active" onclick="switchTab('chat')">问答</button>
+  <button id="tab-config" onclick="switchTab('config')">控制台</button>
+  <span class="spacer"></span>
+  <span id="status"></span>
+</nav>
+
+<div id="view-chat">
+  <div id="chat">
+    <div id="messages"><div class="msg bot">你好,我是你的知识库助手。提问会基于已索引的内容回答并附来源引用。</div></div>
+    <div id="inputbar">
+      <input id="q" placeholder="问点什么…(Enter 发送)" onkeydown="if(event.key==='Enter')ask()">
+      <button class="primary" onclick="ask()">发送</button>
+    </div>
+  </div>
 </div>
-<div id="msg"></div>
-<div id="root"><p>加载中…</p></div>
+
+<div id="view-config" hidden>
+  <div id="bar">
+    <button class="primary" onclick="save()">保存并生效</button>
+    <button onclick="test()">测试连通</button>
+    <button onclick="runIndex()">立即索引</button>
+    <button onclick="loadCfg()">重新加载</button>
+  </div>
+  <div id="msg"></div>
+  <div id="root"><p>加载中…</p></div>
+</div>
 
 <script>
 const KEEP = "__KEEP__";
@@ -55,6 +91,7 @@ const QA_FIELDS = [
 ];
 let cfg = null;
 
+/* ---------- shared ---------- */
 function tokenHeaders() {
   const t = localStorage.getItem("ragoss_token") ?? "";
   return t ? { Authorization: "Bearer " + t } : {};
@@ -74,6 +111,47 @@ async function api(method, path, body) {
   if (!r.ok) throw new Error(j.error || r.status);
   return j;
 }
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+function switchTab(t) {
+  document.getElementById("view-chat").hidden = t !== "chat";
+  document.getElementById("view-config").hidden = t !== "config";
+  document.getElementById("tab-chat").classList.toggle("active", t === "chat");
+  document.getElementById("tab-config").classList.toggle("active", t === "config");
+  if (t === "config" && !cfg) loadCfg();
+}
+
+/* ---------- chat ---------- */
+async function ask() {
+  const el = document.getElementById("q");
+  const q = el.value.trim();
+  if (!q) return;
+  el.value = "";
+  const box = document.getElementById("messages");
+  box.insertAdjacentHTML("beforeend", `<div class="msg user">${esc(q)}</div>`);
+  const pending = document.createElement("div");
+  pending.className = "msg bot pending";
+  pending.textContent = "检索中…";
+  box.appendChild(pending);
+  box.scrollTop = box.scrollHeight;
+  try {
+    const r = await api("POST", "/ask", { query: q });
+    pending.className = "msg bot";
+    pending.innerHTML = renderAnswer(r.answer, r.sources);
+  } catch (e) {
+    pending.className = "msg bot";
+    pending.textContent = "出错了:" + (e.message || e);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+function renderAnswer(answer, sources) {
+  const body = esc(answer).replace(/\[(\d+)\]/g, '<span class="cite">[$1]</span>');
+  const src = (sources ?? []).map((s) =>
+    `<details><summary>[${s.n}] ${esc(s.storage)}://${esc(s.key)} · ${esc(s.kind)}</summary>` +
+    `<div style="opacity:.7">${esc(s.textPreview)}…</div></details>`).join("");
+  return body + (src ? `<div class="sources"><b>来源</b>${src}</div>` : "");
+}
+
+/* ---------- config console ---------- */
 function msg(s, cls) {
   const el = document.getElementById("msg");
   el.textContent = s;
@@ -81,36 +159,31 @@ function msg(s, cls) {
 }
 function field(def, val) {
   const [key, label, type, options] = def;
-  const id = esc(key);
   if (type === "select") {
-    return `<label>${label}<select data-k="${id}">${options.map(o =>
+    return `<label>${label}<select data-k="${esc(key)}">${options.map(o =>
       `<option ${o === val ? "selected" : ""}>${o}</option>`).join("")}</select></label>`;
   }
   const isSecret = type === "password";
   const ph = isSecret && val === KEEP ? "已设置(不改则保留)" : "";
   const v = isSecret && val === KEEP ? "" : (val ?? "");
-  return `<label>${label}<input data-k="${id}" type="${type === "number" ? "number" : isSecret ? "password" : "text"}" value="${esc(String(v))}" placeholder="${ph}"></label>`;
+  return `<label>${label}<input data-k="${esc(key)}" type="${type === "number" ? "number" : isSecret ? "password" : "text"}" value="${esc(v)}" placeholder="${esc(ph)}"></label>`;
 }
 function card(fields, obj, title, onRemove) {
-  const rows = fields.map((f) => field(f, obj?.[f[0]])).join("");
-  return `<div class="card"><header><span>${esc(title)}</span>${onRemove ? `<button class="del" onclick="${onRemove}">删除</button>` : ""}</header><div class="row">${rows}</div></div>`;
+  return `<div class="card"><header><span>${esc(title)}</span>${onRemove ? `<button class="del" onclick="${onRemove}">删除</button>` : ""}</header><div class="row">${fields.map((f) => field(f, obj?.[f[0]])).join("")}</div></div>`;
 }
-function esc(s) { return s.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
 function collect(root, fields, defaults = {}) {
   const out = { ...defaults };
   root.querySelectorAll("[data-k]").forEach((el) => {
     const k = el.dataset.k;
     const f = fields.find((x) => x[0] === k);
     let v = el.value.trim();
-    if (f && f[2] === "password" && v === "" && el.placeholder) v = KEEP;   // keep existing secret
+    if (f && f[2] === "password" && v === "" && el.placeholder) v = KEEP;
     if (v === "") return;
     out[k] = f && f[2] === "number" ? Number(v) : v;
   });
   return out;
 }
-
 function render() {
-  const root = document.getElementById("root");
   const st = (cfg.storages ?? []).map((s, i) =>
     card(STORAGE_FIELDS, s, `存储:${s.name || "#" + (i + 1)}`, `delItem('storages',${i})`)).join("");
   const em = (cfg.embeddings ?? []).map((e, i) =>
@@ -119,20 +192,18 @@ function render() {
   const ret = card([["topK","每路召回 topK","number"],["finalK","最终 finalK","number"]], cfg.retrieval ?? {}, "检索参数");
   const db = card([["path","本地路径","text"],["storage","回存存储名","text"],["key","回存 key","text"]],
     { path: cfg.db?.path, storage: cfg.db?.remote?.storage, key: cfg.db?.remote?.key }, "数据库");
-  root.innerHTML = `
-    <h2>存储后端</h2>${st}<button onclick="addItem('storages')">+ 添加存储</button>
-    <h2>嵌入模型(多路)</h2>${em}<button onclick="addItem('embeddings')">+ 添加嵌入路由</button>
-    <h2>问答模型</h2>${qa}
-    <h2>检索参数</h2>${ret}
-    <h2>数据库</h2>${db}
-    <p style="opacity:.6;font-size:.8rem">密钥留空 = 保留现有值;支持 env:VAR 环境变量引用。保存后立即热生效并写回 config.json。</p>`;
+  document.getElementById("root").innerHTML = `
+    <section class="config"><h2>存储后端</h2>${st}<button onclick="addItem('storages')">+ 添加存储</button></section>
+    <section class="config"><h2>嵌入模型(多路)</h2>${em}<button onclick="addItem('embeddings')">+ 添加嵌入路由</button></section>
+    <section class="config"><h2>问答模型</h2>${qa}</section>
+    <section class="config"><h2>检索参数</h2>${ret}</section>
+    <section class="config"><h2>数据库</h2>${db}
+    <p style="opacity:.6;font-size:.8rem">密钥留空 = 保留现有值;支持 env:VAR 环境变量引用。保存后立即热生效并写回 config.json。</p></section>`;
 }
 function addItem(sec) { cfg[sec].push(sec === "storages" ? { type: "s3", name: "" } : { provider: "dashscope", name: "" }); render(); }
 function delItem(sec, i) { cfg[sec].splice(i, 1); render(); }
-
 function collectAll() {
-  const root = document.getElementById("root");
-  const cards = root.querySelectorAll(".card");
+  const cards = document.querySelectorAll("#root .card");
   const secs = { storages: [], embeddings: [] };
   cards.forEach((el) => {
     const title = el.querySelector("header span").textContent;
@@ -150,13 +221,10 @@ function collectAll() {
   cfg.storages = secs.storages;
   cfg.embeddings = secs.embeddings;
 }
-
-async function load() {
+async function loadCfg() {
   try {
     cfg = await api("GET", "/api/config");
     render();
-    const h = await api("GET", "/health");
-    document.getElementById("health").textContent = `已索引 ${h.vectors} 向量 / 路由: ${h.routes.join(", ")}`;
     msg("配置已加载");
   } catch (e) { msg(String(e.message || e), "err"); }
 }
@@ -165,7 +233,7 @@ async function save() {
   try {
     const r = await api("PUT", "/api/config", cfg);
     msg("已保存并热生效:" + r.saved, "ok");
-    await load();
+    await loadStatus();
   } catch (e) { msg("保存失败:" + (e.message || e), "err"); }
 }
 async function test() {
@@ -183,10 +251,16 @@ async function runIndex() {
     msg(`索引完成:新增 ${r.added} / 更新 ${r.changed} / 删除 ${r.removed} / 失败 ${r.errors.length}` +
         (r.errors.length ? "\n" + r.errors.map((e) => `${e.storage}://${e.key}: ${e.error}`).join("\n") : ""),
         r.errors.length ? "err" : "ok");
-    await load();
   } catch (e) { msg(String(e.message || e), "err"); }
 }
-load();
+
+async function loadStatus() {
+  try {
+    const h = await api("GET", "/health");
+    document.getElementById("status").textContent = `${h.vectors} 向量已索引`;
+  } catch { /* chat works without admin token; status is optional */ }
+}
+loadStatus();
 </script>
 </body>
 </html>
