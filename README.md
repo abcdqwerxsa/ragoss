@@ -9,11 +9,13 @@
 ```bash
 pnpm install
 pnpm test                       # 核心逻辑自检(无需网络/key)
-cp config.example.json config.json   # 填入你的存储与模型
-pnpm index                      # 增量索引(全量重建: pnpm index -- --full)
-pnpm ask -- "我的问题"           # 终端问答
-pnpm dev                        # 或启动 HTTP 服务(默认 :8787)
+cp config.example.json config.json   # 最低限度占位(面板会重写它)
+pnpm dev                        # 打开 http://localhost:8787 直接在控制台配存储/模型
 ```
+
+控制台(根路径 `/`)可配置全部存储与模型(端点、key、模型 id)、测试连通性、立即索引;保存后热生效并写回 `config.json`。公网部署务必设置 `ADMIN_TOKEN` 环境变量(面板合 API 均需携带)。
+
+命令行同样可用:`pnpm index`(增量索引)、`pnpm ask -- "问题"`。
 
 ## HTTP API
 
