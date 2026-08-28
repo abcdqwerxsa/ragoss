@@ -18,6 +18,12 @@ export function mountAdmin(
   app.use("/", authMiddleware);
 
   app.get("/", (c) => c.html(readFileSync(new URL("./panel.html", import.meta.url), "utf8")));
+  app.get("/logo.svg", (c) =>
+    c.body(readFileSync(new URL("./logo.svg", import.meta.url), "utf8"), 200, {
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "public, max-age=86400",
+    }),
+  );
 
   // sanitized config: secrets -> "__KEEP__" unless they are env: references
   app.get("/api/config", (c) => c.json(sanitize(getRt().cfg)));

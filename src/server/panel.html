@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ragoss 知识库</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>
   :root {
     --bg: #f5f7fa; --panel: #ffffff; --border: #e2e8f0; --border-strong: #cbd5e1;
@@ -18,7 +19,7 @@
   /* top bar */
   header.top { background: var(--panel); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
   .top-inner { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; display: flex; align-items: center; gap: .9rem; height: 54px; }
-  .logo { width: 28px; height: 28px; border-radius: 6px; background: var(--brand); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 15px; }
+  .logo { border-radius: 6px; display: block; }
   .brand { font-weight: 600; font-size: 15px; letter-spacing: .2px; }
   .brand small { color: var(--muted); font-weight: 400; margin-left: .4rem; font-size: 12px; }
   .top-inner .spacer { flex: 1; }
@@ -81,7 +82,7 @@
 <body>
 <header class="top">
   <div class="top-inner">
-    <div class="logo">R</div>
+    <img class="logo" src="/logo.svg" alt="ragoss" width="28" height="28">
     <div class="brand">ragoss 知识库<small>Personal Knowledge Base</small></div>
     <span class="spacer"></span>
     <span id="status" class="pill">…</span>
