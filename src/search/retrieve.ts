@@ -6,9 +6,9 @@ import { rrf } from "./rrf.js";
 import { noopReranker } from "./rerank/noop.js";
 
 export interface RetrieveOpts {
-  topK?: number;
-  finalK?: number;
-  reranker?: RerankProvider;
+  topK?: number | undefined;
+  finalK?: number | undefined;
+  reranker?: RerankProvider | undefined;
 }
 
 export async function retrieve(
