@@ -1,8 +1,9 @@
-/** OpenAI Chat Completions adapter. */
-import type { ChatMessage, ChatPart } from "../../core/types.js";
+/** OpenAI Chat Completions adapter (streaming when onDelta provided). */
+import type { ChatMessage, ChatOpts, ChatPart } from "../../core/types.js";
+import { readSse } from "../sse.js";
 
 interface OpenAiResponse {
-  choices?: { message?: { content?: string } }[];
+  choices?: { message?: { content?: string }; delta?: { content?: string } }[];
   error?: { message?: string };
 }
 
@@ -11,15 +12,38 @@ export async function openaiChat(
   apiKey: string,
   model: string,
   messages: ChatMessage[],
-  maxTokens?: number,
+  opts?: ChatOpts,
 ): Promise<string> {
-  const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+  const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
+
+  if (opts?.onDelta) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages: messages.map((m) => ({ role: m.role, content: toContent(m.parts) })),
+        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`openai chat(stream) failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+    let acc = "";
+    await readSse(res, (j) => {
+      const t = (j as OpenAiResponse).choices?.[0]?.delta?.content;
+      if (t) { acc += t; opts.onDelta!(t); }
+    });
+    return acc;
+  }
+
+  const res = await fetch(url, {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       model,
       messages: messages.map((m) => ({ role: m.role, content: toContent(m.parts) })),
-      ...(maxTokens ? { max_tokens: maxTokens } : {}),
+      ...(opts?.maxTokens ? { max_tokens: opts.maxTokens } : {}),
     }),
   });
   const body = (await res.json()) as OpenAiResponse;

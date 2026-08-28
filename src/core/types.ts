@@ -81,5 +81,11 @@ export interface ChatMessage {
 
 export interface QaProvider {
   readonly protocol: string;
-  chat(messages: ChatMessage[], opts?: { maxTokens?: number }): Promise<string>;
+  chat(messages: ChatMessage[], opts?: ChatOpts): Promise<string>;
+}
+
+export interface ChatOpts {
+  maxTokens?: number;
+  /** when set, provider streams and calls this per text delta; still returns full text */
+  onDelta?: (text: string) => void;
 }

@@ -1,7 +1,7 @@
 /** QA provider factory + RAG assembly with source citations and inline images. */
 import type { QaConfig } from "../core/config.js";
 import { resolveSecret } from "../core/config.js";
-import type { ChatMessage, ChatPart, QaProvider, RetrievalHit, StorageProvider } from "../core/types.js";
+import type { ChatMessage, ChatOpts, ChatPart, QaProvider, RetrievalHit, StorageProvider } from "../core/types.js";
 import { openaiChat } from "./adapters/openai.js";
 import { openaiResponses } from "./adapters/openai-responses.js";
 import { googleChat } from "./adapters/google.js";
@@ -11,17 +11,16 @@ const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // skip larger inline images to protect
 
 export function createQaProvider(cfg: QaConfig): QaProvider {
   const apiKey = resolveSecret(cfg.apiKey);
-  const chat = (messages: ChatMessage[], opts?: { maxTokens?: number }): Promise<string> => {
-    const m = opts?.maxTokens;
+  const chat = (messages: ChatMessage[], opts?: ChatOpts): Promise<string> => {
     switch (cfg.protocol) {
       case "openai":
-        return openaiChat(cfg.baseUrl, apiKey, cfg.model, messages, m);
+        return openaiChat(cfg.baseUrl, apiKey, cfg.model, messages, opts);
       case "openai-responses":
-        return openaiResponses(cfg.baseUrl, apiKey, cfg.model, messages, m);
+        return openaiResponses(cfg.baseUrl, apiKey, cfg.model, messages, opts);
       case "google":
-        return googleChat(cfg.baseUrl, apiKey, cfg.model, messages, m);
+        return googleChat(cfg.baseUrl, apiKey, cfg.model, messages, opts);
       case "anthropic":
-        return anthropicChat(cfg.baseUrl, apiKey, cfg.model, messages, m);
+        return anthropicChat(cfg.baseUrl, apiKey, cfg.model, messages, opts);
     }
   };
   return { protocol: cfg.protocol, chat };
@@ -38,6 +37,7 @@ export async function askWithSources(
   query: string,
   hits: RetrievalHit[],
   maxSources = 6,
+  onDelta?: (text: string) => void,
 ): Promise<AskResult> {
   if (hits.length === 0) {
     return { answer: "知识库中未找到与问题相关的内容。请先在控制台完成索引,或换个问法。", sources: [] };
@@ -78,17 +78,20 @@ export async function askWithSources(
   }
   parts.push({ type: "text", text: `问题:${query}` });
 
-  const answer = await qa.chat([
-    {
-      role: "system",
-      parts: [
-        {
-          type: "text",
-          text: "你是个人知识库问答助手。仅依据提供的编号资料回答,引用来源时使用 [n] 标记;资料不足以回答时明确说明。",
-        },
-      ],
-    },
-    { role: "user", parts },
-  ]);
+  const answer = await qa.chat(
+    [
+      {
+        role: "system",
+        parts: [
+          {
+            type: "text",
+            text: "你是个人知识库问答助手。仅依据提供的编号资料回答,引用来源时使用 [n] 标记;资料不足以回答时明确说明。",
+          },
+        ],
+      },
+      { role: "user", parts },
+    ],
+    onDelta ? { onDelta } : undefined,
+  );
   return { answer, sources };
 }

@@ -31,9 +31,11 @@ async function main() {
       finalK: cfg.retrieval?.finalK,
     });
     const qa = createQaProvider(cfg.qa);
-    const result = await askWithSources(qa, storages, query, hits, cfg.qa.maxSources);
-    console.log(result.answer);
-    console.log("\n来源:");
+    const result = await askWithSources(
+      qa, storages, query, hits, cfg.qa.maxSources,
+      (t) => process.stdout.write(t),
+    );
+    process.stdout.write("\n\n来源:\n");
     for (const s of result.sources) console.log(` [${s.n}] ${s.storage}://${s.key}`);
     return;
   }

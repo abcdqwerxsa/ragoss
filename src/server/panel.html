@@ -134,9 +134,33 @@ async function ask() {
   box.appendChild(pending);
   box.scrollTop = box.scrollHeight;
   try {
-    const r = await api("POST", "/ask", { query: q });
-    pending.className = "msg bot";
-    pending.innerHTML = renderAnswer(r.answer, r.sources);
+    const r = await fetch("/ask", {
+      method: "POST",
+      headers: { ...tokenHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, stream: true }),
+    });
+    if (r.status === 401) { const t = prompt("请输入管理令牌 (ADMIN_TOKEN):"); if (t !== null) localStorage.setItem("ragoss_token", t); throw new Error("未授权,令牌已保存,请重试"); }
+    if (!r.ok || !r.body) throw new Error(((await r.json().catch(() => ({}))).error) || r.status);
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", answer = "";
+    pending.classList.remove("pending");
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        const j = JSON.parse(line.slice(5).trim());
+        if (j.delta) { answer += j.delta; pending.textContent = answer; box.scrollTop = box.scrollHeight; }
+        if (j.error) { answer = "出错了:" + j.error; pending.textContent = answer; }
+        if (j.done) { pending.className = "msg bot"; pending.innerHTML = renderAnswer(answer, j.sources); }
+      }
+    }
+    if (!pending.innerHTML) { pending.className = "msg bot"; pending.textContent = answer || "(无响应)"; }
   } catch (e) {
     pending.className = "msg bot";
     pending.textContent = "出错了:" + (e.message || e);

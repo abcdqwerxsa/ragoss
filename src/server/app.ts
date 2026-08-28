@@ -1,10 +1,11 @@
 /** ragoss HTTP server: /health, /index, /search, /ask + admin panel (config hot-reload). */
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { loadConfig, type Config } from "../core/config.js";
 import { countVectors } from "../db.js";
 import { runIndex } from "../index/pipeline.js";
-import { askWithSources } from "../qa/index.js";
+import { askWithSources, type AskResult } from "../qa/index.js";
 import { retrieve } from "../search/retrieve.js";
 import type { RetrievalFilter } from "../core/types.js";
 import { buildRuntime, type Runtime } from "./runtime.js";
@@ -53,6 +54,21 @@ export async function createApp(): Promise<{ app: Hono; runtime: Runtime }> {
       topK: rt.cfg.retrieval?.topK,
       finalK: rt.cfg.retrieval?.finalK,
     });
+    if (body.stream === true) {
+      return streamSSE(c, async (stream) => {
+        let result: AskResult;
+        try {
+          result = await askWithSources(
+            rt.qa, rt.storages, String(body.query), hits, rt.cfg.qa.maxSources,
+            (delta) => void stream.writeSSE({ data: JSON.stringify({ delta }) }),
+          );
+        } catch (e) {
+          await stream.writeSSE({ data: JSON.stringify({ error: String((e as Error)?.message ?? e).slice(0, 500) }) });
+          return;
+        }
+        await stream.writeSSE({ data: JSON.stringify({ done: true, sources: result.sources }) });
+      });
+    }
     const result = await askWithSources(rt.qa, rt.storages, String(body.query), hits, rt.cfg.qa.maxSources);
     return c.json(result);
   });
