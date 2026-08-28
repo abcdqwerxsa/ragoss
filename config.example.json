@@ -1,0 +1,59 @@
+{
+  "storages": [
+    {
+      "type": "s3",
+      "name": "my-oss",
+      "endpoint": "https://oss-cn-hangzhou.aliyuncs.com",
+      "region": "cn-hangzhou",
+      "bucket": "my-kb",
+      "prefix": "docs/",
+      "accessKeyId": "env:OSS_ACCESS_KEY_ID",
+      "secretAccessKey": "env:OSS_SECRET_ACCESS_KEY"
+    },
+    {
+      "type": "s3",
+      "name": "r2",
+      "endpoint": "https://<account>.r2.cloudflarestorage.com",
+      "region": "auto",
+      "bucket": "kb",
+      "accessKeyId": "env:R2_ACCESS_KEY_ID",
+      "secretAccessKey": "env:R2_SECRET_ACCESS_KEY"
+    },
+    {
+      "type": "webdav",
+      "name": "nas",
+      "endpoint": "https://dav.example.com",
+      "username": "env:WEBDAV_USER",
+      "password": "env:WEBDAV_PASS",
+      "prefix": "/kb"
+    }
+  ],
+  "embeddings": [
+    {
+      "name": "qwen",
+      "provider": "dashscope",
+      "apiKey": "env:DASHSCOPE_API_KEY",
+      "model": "multimodal-embedding-one-peace-v1",
+      "dims": 1024
+    },
+    {
+      "name": "google",
+      "provider": "google",
+      "apiKey": "env:GOOGLE_API_KEY",
+      "model": "gemini-embedding-001",
+      "dims": 3072
+    }
+  ],
+  "qa": {
+    "protocol": "openai",
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKey": "env:OPENAI_API_KEY",
+    "model": "gpt-4o-mini",
+    "maxSources": 6
+  },
+  "retrieval": { "topK": 20, "finalK": 6 },
+  "db": {
+    "path": "ragoss.db",
+    "remote": { "storage": "my-oss", "key": "ragoss/ragoss.db" }
+  }
+}
