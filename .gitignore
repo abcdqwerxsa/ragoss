@@ -4,3 +4,5 @@ dist/
 *.db-journal
 .env
 config.json
+.admin-token-local.txt
+.wrangler/

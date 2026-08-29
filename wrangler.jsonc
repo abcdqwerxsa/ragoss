@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ragoss",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-06-01",
+  "containers": [
+    {
+      "class_name": "RagossContainer",
+      "image": "./Dockerfile",
+      "instance_type": "standard-1",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "RAGOSS", "class_name": "RagossContainer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RagossContainer"] }]
+}
